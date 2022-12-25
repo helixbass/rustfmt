@@ -5,7 +5,7 @@ use crate::comment::{hide_sharp_behind_comment, trim_custom_comment_prefix, Code
 use crate::Config;
 
 use itertools::Itertools;
-use pulldown_cmark::{CodeBlockKind, Event, Parser, Tag};
+use pulldown_cmark::{CodeBlockKind, Event, LinkDef, Parser, Tag};
 use pulldown_cmark_to_cmark::{cmark_resume_with_options, Options, State};
 
 /// Rewrite markdown input.
@@ -17,13 +17,24 @@ use pulldown_cmark_to_cmark::{cmark_resume_with_options, Options, State};
 /// **Note:** The content of indented codeblocks will not be formatted, but indentation may change.
 pub(crate) fn rewrite_markdown(input: &str, config: &Config) -> String {
     let mut result = String::with_capacity(input.len() * 2);
-    let mut parser = Parser::new(input).into_offset_iter().peekable();
+    let parser = Parser::new(input);
+    // Grab the reference links from the parser so we can rewrite them into the result at the end
+    let reference_links = parser
+        .reference_definitions()
+        .iter()
+        .sorted_by(|(_, link_a), (_, link_b)| link_a.span.start.cmp(&link_b.span.start))
+        .map(|(link_lable, LinkDef { dest, .. })| {
+            (link_lable.to_string(), dest.to_string(), "".to_string())
+        })
+        .collect::<Vec<_>>();
 
     let mut fmt_options = None;
     let mut fmt_state = State::default();
 
+    let mut events = parser.into_offset_iter().peekable();
+    while events.peek().is_some() {
+        let current_fmt_options = fmt_options.unwrap_or_else(default_fmt_options);
 
-    while parser.peek().is_some() {
         let (sub_events, next_fmt_options) =
             collect_events_until_fmt_options_update(input, &mut events, &current_fmt_options);
         // Update the formatting options we'll use on the next iteration.
@@ -51,6 +62,19 @@ pub(crate) fn rewrite_markdown(input: &str, config: &Config) -> String {
                 return input.to_owned();
             }
         }
+    }
+
+    // Sort of hackey, but the shortcuts list will only contain links to items that were
+    // referenced in the markdown document so we replace them with the links we got from the
+    // parser, since the parser gives us a complete list of all the reference links.
+    // If we wanted to add a feature to remove dead links, then we could just use the links
+    // from `fmt_state.shortcuts`.
+    let _ = std::mem::replace(&mut fmt_state.shortcuts, reference_links);
+
+    // Calling finalize adds reference style links to the end of the result buffer
+    if let Err(_) = fmt_state.finalize(&mut result) {
+        // Something went wrong just return the original input unchanged
+        return input.to_owned();
     }
     result
 }
