@@ -4,8 +4,8 @@ use std::ops::Range;
 use crate::comment::{hide_sharp_behind_comment, trim_custom_comment_prefix, CodeBlockAttribute};
 use crate::Config;
 
-use itertools::Itertools;
-use pulldown_cmark::{CodeBlockKind, Event, LinkDef, Parser, Tag};
+use itertools::{multipeek, Itertools, MultiPeek};
+use pulldown_cmark::{CodeBlockKind, CowStr, Event, LinkDef, LinkType, Parser, Tag};
 use pulldown_cmark_to_cmark::{cmark_resume_with_options, Options, State};
 
 /// Rewrite markdown input.
@@ -46,9 +46,10 @@ pub(crate) fn rewrite_markdown(input: &str, config: &Config) -> String {
             continue;
         }
 
-        let md_code_formatter = CodeBlockFormatter::new(sub_events.into_iter(), config);
+        let link_formatter = TypeLinkFormatter::new(sub_events.into_iter());
+        let code_formatter = CodeBlockFormatter::new(link_formatter, config);
         match cmark_resume_with_options(
-            md_code_formatter,
+            code_formatter,
             &mut result,
             Some(fmt_state),
             current_fmt_options,
@@ -234,6 +235,66 @@ where
                 // code fence chars when rendering to markdown with `pulldown_cmark_to_cmark`
                 self.indented_code_block = false;
                 event = Event::End(Tag::Paragraph)
+            }
+            _ => {}
+        }
+        Some(event)
+    }
+}
+
+struct TypeLinkFormatter<'e, E>
+where
+    E: Iterator<Item = Event<'e>>,
+{
+    inner: MultiPeek<E>,
+    in_type_link: bool,
+}
+
+impl<'e, E> TypeLinkFormatter<'e, E>
+where
+    E: Iterator<Item = Event<'e>>,
+{
+    fn new(inner: E) -> Self {
+        let inner = multipeek(inner);
+        Self {
+            inner,
+            in_type_link: false,
+        }
+    }
+}
+
+impl<'e, E> Iterator for TypeLinkFormatter<'e, E>
+where
+    E: Iterator<Item = Event<'e>>,
+{
+    type Item = E::Item;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let mut event = self.inner.next()?;
+
+        // rustdoc supports linking to rust items by name using reference style links.
+        // See the rustdoc docs for more details
+        // https://doc.rust-lang.org/rustdoc/write-documentation/linking-to-items-by-name.html
+        // `pulldown_cmark_to_cmark` will try to escape these link. For example it will try to turn
+        // [`Debug`] into  \[`Debug`\]. We want to avoid this escaping so we'll modify the event
+        // stream to replace `[` and `]` with start and end link events.
+        match event {
+            Event::Text(CowStr::Borrowed("[")) => {
+                let next = self.inner.peek();
+                let is_next_shortcut_text =
+                    matches!(next, Some(Event::Code(_)) | Some(Event::Text(_)));
+
+                let is_after_next_closing_bracket =
+                    matches!(self.inner.peek(), Some(Event::Text(CowStr::Borrowed("]"))));
+
+                if is_next_shortcut_text && is_after_next_closing_bracket {
+                    self.in_type_link = true;
+                    event = Event::Start(Tag::Link(LinkType::Shortcut, "".into(), "".into()))
+                }
+            }
+            Event::Text(CowStr::Borrowed("]")) if self.in_type_link => {
+                self.in_type_link = false;
+                event = Event::End(Tag::Link(LinkType::Shortcut, "".into(), "".into()))
             }
             _ => {}
         }
