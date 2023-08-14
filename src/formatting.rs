@@ -190,7 +190,7 @@ fn format_markdown_code_snippets<T: FormatHandler>(
     handler: &mut T,
 ) -> Result<FormatReport, ErrorKind> {
     let input = std::fs::read_to_string(&path)?;
-    let mut result = rewrite_markdown(&input, config);
+    let mut result = rewrite_markdown(&input, config).into_owned();
 
     if !result.ends_with('\n') {
         // Add a trailing newline if needed
