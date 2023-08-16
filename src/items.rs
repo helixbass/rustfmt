@@ -123,6 +123,7 @@ impl Rewrite for ast::Local {
                 init,
                 &RhsAssignKind::Expr(&init.kind, init.span),
                 nested_shape,
+                None,
             )?;
 
             if let Some(block) = else_block {
@@ -671,6 +672,7 @@ impl<'a> FmtVisitor<'a> {
                 shape,
                 &RhsAssignKind::Expr(&ex.kind, ex.span),
                 RhsTactics::AllowOverflow,
+                None,
             )?
         } else {
             variant_body
@@ -1159,6 +1161,7 @@ pub(crate) fn format_trait(
             shape,
             &RhsAssignKind::Bounds,
             RhsTactics::ForceNextLineWithoutIndent,
+            None,
         )?;
     }
 
@@ -1347,6 +1350,7 @@ pub(crate) fn format_trait_alias(
         &trait_alias_bounds,
         &RhsAssignKind::Bounds,
         shape.sub_width(1)?,
+        None,
     )
     .map(|s| s + ";")
 }
@@ -1804,7 +1808,7 @@ fn rewrite_ty<R: Rewrite>(
 
         // 1 = `;`
         let shape = Shape::indented(indent, context.config).sub_width(1)?;
-        rewrite_assign_rhs(context, lhs, &*ty, &RhsAssignKind::Ty, shape).map(|s| s + ";")
+        rewrite_assign_rhs(context, lhs, &*ty, &RhsAssignKind::Ty, shape, None).map(|s| s + ";")
     } else {
         Some(format!("{result};"))
     }
@@ -1894,7 +1898,8 @@ pub(crate) fn rewrite_struct_field(
 
     let is_prefix_empty = prefix.is_empty();
     // We must use multiline. We are going to put attributes and a field on different lines.
-    let field_str = rewrite_assign_rhs(context, prefix, &*field.ty, &RhsAssignKind::Ty, shape)?;
+    let field_str =
+        rewrite_assign_rhs(context, prefix, &*field.ty, &RhsAssignKind::Ty, shape, None)?;
     // Remove a leading white-space from `rewrite_assign_rhs()` when rewriting a tuple struct.
     let field_str = if is_prefix_empty {
         field_str.trim_start()
@@ -3340,6 +3345,7 @@ impl Rewrite for ast::ForeignItem {
                     &**ty,
                     &RhsAssignKind::Ty,
                     shape.sub_width(1)?,
+                    None,
                 )
                 .map(|s| s + ";")
             }

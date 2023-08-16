@@ -1956,6 +1956,7 @@ fn rewrite_assignment(
         rhs,
         &RhsAssignKind::Expr(&rhs.kind, rhs.span),
         shape,
+        None,
     )
 }
 
@@ -1979,8 +1980,17 @@ pub(crate) fn rewrite_assign_rhs<S: Into<String>, R: Rewrite>(
     ex: &R,
     rhs_kind: &RhsAssignKind<'_>,
     shape: Shape,
+    operator_suffix: Option<&str>,
 ) -> Option<String> {
-    rewrite_assign_rhs_with(context, lhs, ex, shape, rhs_kind, RhsTactics::Default)
+    rewrite_assign_rhs_with(
+        context,
+        lhs,
+        ex,
+        shape,
+        rhs_kind,
+        RhsTactics::Default,
+        operator_suffix,
+    )
 }
 
 pub(crate) fn rewrite_assign_rhs_expr<R: Rewrite>(
@@ -1990,7 +2000,9 @@ pub(crate) fn rewrite_assign_rhs_expr<R: Rewrite>(
     shape: Shape,
     rhs_kind: &RhsAssignKind<'_>,
     rhs_tactics: RhsTactics,
+    operator_suffix: Option<&str>,
 ) -> Option<String> {
+    let operator_suffix = operator_suffix.unwrap_or("=");
     let last_line_width = last_line_width(lhs).saturating_sub(if lhs.contains('\n') {
         shape.indent.width()
     } else {
@@ -2002,7 +2014,10 @@ pub(crate) fn rewrite_assign_rhs_expr<R: Rewrite>(
         offset: shape.offset + last_line_width + 1,
         ..shape
     });
-    let has_rhs_comment = if let Some(offset) = lhs.find_last_uncommented("=") {
+    let has_rhs_comment = if let Some(offset) = lhs
+        .find_last_uncommented(operator_suffix)
+        .map(|offset| offset + operator_suffix.len() - 1)
+    {
         lhs.trim_end().len() > offset + 1
     } else {
         false
@@ -2026,9 +2041,18 @@ pub(crate) fn rewrite_assign_rhs_with<S: Into<String>, R: Rewrite>(
     shape: Shape,
     rhs_kind: &RhsAssignKind<'_>,
     rhs_tactics: RhsTactics,
+    operator_suffix: Option<&str>,
 ) -> Option<String> {
     let lhs = lhs.into();
-    let rhs = rewrite_assign_rhs_expr(context, &lhs, ex, shape, rhs_kind, rhs_tactics)?;
+    let rhs = rewrite_assign_rhs_expr(
+        context,
+        &lhs,
+        ex,
+        shape,
+        rhs_kind,
+        rhs_tactics,
+        operator_suffix,
+    )?;
     Some(lhs + &rhs)
 }
 
@@ -2049,7 +2073,7 @@ pub(crate) fn rewrite_assign_rhs_with_comments<S: Into<String>, R: Rewrite>(
     } else {
         shape
     };
-    let rhs = rewrite_assign_rhs_expr(context, &lhs, ex, shape, rhs_kind, rhs_tactics)?;
+    let rhs = rewrite_assign_rhs_expr(context, &lhs, ex, shape, rhs_kind, rhs_tactics, None)?;
 
     if contains_comment {
         let rhs = rhs.trim_start();

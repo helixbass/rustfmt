@@ -1395,6 +1395,7 @@ fn format_lazy_static(
             &*expr,
             &RhsAssignKind::Expr(&expr.kind, expr.span),
             nested_shape.sub_width(1)?,
+            None,
         )?);
         result.push(';');
         if i != last {
@@ -1499,6 +1500,7 @@ fn format_arrow_separated_key_value_pairs(
                 &*value,
                 &RhsAssignKind::Expr(&value.kind, value.span),
                 nested_shape.sub_width(1)?,
+                Some("=>"),
             )?,
             ExprOrArrowSeparatedKeyValuePairs::ArrowSeparatedKeyValuePairs((value, delimiter)) => {
                 key_value_pair.push_str(&format!(

@@ -50,3 +50,24 @@ rule! {
         }
     ]
 }
+
+// basic real example
+pub fn no_debugger_rule() -> Arc<dyn Rule> {
+    rule! {
+        name =>  "no-debugger",
+        languages => [Javascript],
+        messages => [
+            unexpected => "Unexpected 'debugger' statement.",
+        ],
+        listeners => [
+            r#"(
+              (debugger_statement) @c
+            )"# => |node, context| {
+                context.report(violation! {
+                    node => node,
+                    message_id => "unexpected",
+                });
+            },
+        ]
+    }
+}
