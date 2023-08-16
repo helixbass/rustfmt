@@ -1,0 +1,3 @@
+rule! {
+    key =>  value,
+}
