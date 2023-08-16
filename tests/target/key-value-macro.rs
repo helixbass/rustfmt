@@ -24,3 +24,10 @@ rule! {
         nested_key => value,
     },
 }
+
+// nested square brackets
+rule! {
+    key => [
+        nested_key => value,
+    ],
+}

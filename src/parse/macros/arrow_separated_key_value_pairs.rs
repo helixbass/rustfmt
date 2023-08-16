@@ -11,7 +11,7 @@ pub(crate) type ArrowSeparatedKeyValuePairs =
 
 pub(crate) enum ExprOrArrowSeparatedKeyValuePairs {
     Expr(P<ast::Expr>),
-    ArrowSeparatedKeyValuePairs(ArrowSeparatedKeyValuePairs),
+    ArrowSeparatedKeyValuePairs((ArrowSeparatedKeyValuePairs, Delimiter)),
 }
 
 pub(crate) fn parse_arrow_separated_key_value_pairs(
@@ -77,18 +77,20 @@ fn parse_value<'a, 'b: 'a>(
             cloned_parser.sess.span_diagnostic.reset_err_count();
         }
     }
-    if !(parser.eat(&TokenKind::OpenDelim(Delimiter::Brace))
-        || parser.eat(&TokenKind::OpenDelim(Delimiter::Bracket)))
-    {
+    let delimiter = if parser.eat(&TokenKind::OpenDelim(Delimiter::Brace)) {
+        Delimiter::Brace
+    } else if parser.eat(&TokenKind::OpenDelim(Delimiter::Bracket)) {
+        Delimiter::Bracket
+    } else {
         return None;
-    }
+    };
     let value_contents_token_stream = parser.parse_tokens();
     let ret = _parse_arrow_separated_key_value_pairs(
         context,
         &mut super::build_parser(context, value_contents_token_stream),
     )
     // .map(ExprOrArrowSeparatedKeyValuePairs::ArrowSeparatedKeyValuePairs)
-    .map(|x| ExprOrArrowSeparatedKeyValuePairs::ArrowSeparatedKeyValuePairs(x));
+    .map(|x| ExprOrArrowSeparatedKeyValuePairs::ArrowSeparatedKeyValuePairs((x, delimiter)));
     let _ = parser.eat(&TokenKind::CloseDelim(Delimiter::Brace))
         || parser.eat(&TokenKind::CloseDelim(Delimiter::Bracket));
     ret

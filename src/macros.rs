@@ -1465,6 +1465,7 @@ fn format_arrow_separated_key_value_pairs_macro(
         context,
         shape,
         &parsed_elems,
+        Delimiter::Brace,
     )?);
     Some(result)
 }
@@ -1473,13 +1474,18 @@ fn format_arrow_separated_key_value_pairs(
     context: &RewriteContext<'_>,
     shape: Shape,
     parsed_elems: &ArrowSeparatedKeyValuePairs,
+    delimiter: Delimiter,
 ) -> Option<String> {
     let mut result = String::with_capacity(1024);
     let nested_shape = shape
         .block_indent(context.config.tab_spaces())
         .with_max_width(context.config);
 
-    result.push('{');
+    result.push(match delimiter {
+        Delimiter::Brace => '{',
+        Delimiter::Bracket => '[',
+        _ => unreachable!(),
+    });
     result.push_str(&nested_shape.indent.to_string_with_newline(context.config));
 
     let last = parsed_elems.len() - 1;
@@ -1494,10 +1500,15 @@ fn format_arrow_separated_key_value_pairs(
                 &RhsAssignKind::Expr(&value.kind, value.span),
                 nested_shape.sub_width(1)?,
             )?,
-            ExprOrArrowSeparatedKeyValuePairs::ArrowSeparatedKeyValuePairs(value) => {
+            ExprOrArrowSeparatedKeyValuePairs::ArrowSeparatedKeyValuePairs((value, delimiter)) => {
                 key_value_pair.push_str(&format!(
                     " {}",
-                    format_arrow_separated_key_value_pairs(context, nested_shape, value)?
+                    format_arrow_separated_key_value_pairs(
+                        context,
+                        nested_shape,
+                        value,
+                        *delimiter
+                    )?
                 ));
                 key_value_pair
             }
@@ -1509,7 +1520,11 @@ fn format_arrow_separated_key_value_pairs(
     }
 
     result.push_str(&shape.indent.to_string_with_newline(context.config));
-    result.push('}');
+    result.push(match delimiter {
+        Delimiter::Brace => '}',
+        Delimiter::Bracket => ']',
+        _ => unreachable!(),
+    });
 
     Some(result)
 }
