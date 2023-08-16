@@ -62,27 +62,21 @@ fn parse_value<'a, 'b: 'a>(
     parser: &'a mut Parser<'b>,
 ) -> Option<ExprOrArrowSeparatedKeyValuePairs> {
     let mut cloned_parser = (*parser).clone();
-    println!("parse_value() 1");
     match cloned_parser.parse_expr() {
         Ok(expr) => {
-            println!("parse_value() 2");
             if cloned_parser.sess.span_diagnostic.has_errors().is_some() {
-                println!("parse_value() 3");
                 cloned_parser.sess.span_diagnostic.reset_err_count();
             } else {
-                println!("parse_value() 4");
                 // Parsing succeeded.
                 *parser = cloned_parser;
                 return Some(ExprOrArrowSeparatedKeyValuePairs::Expr(expr));
             }
         }
         Err(e) => {
-            println!("parse_value() 5");
             e.cancel();
             cloned_parser.sess.span_diagnostic.reset_err_count();
         }
     }
-    println!("parse_value() 6");
     if !(parser.eat(&TokenKind::OpenDelim(Delimiter::Brace))
         || parser.eat(&TokenKind::OpenDelim(Delimiter::Bracket)))
     {
@@ -94,10 +88,7 @@ fn parse_value<'a, 'b: 'a>(
         &mut super::build_parser(context, value_contents_token_stream),
     )
     // .map(ExprOrArrowSeparatedKeyValuePairs::ArrowSeparatedKeyValuePairs)
-    .map(|x| {
-        println!("parse_value() 7");
-        ExprOrArrowSeparatedKeyValuePairs::ArrowSeparatedKeyValuePairs(x)
-    });
+    .map(|x| ExprOrArrowSeparatedKeyValuePairs::ArrowSeparatedKeyValuePairs(x));
     let _ = parser.eat(&TokenKind::CloseDelim(Delimiter::Brace))
         || parser.eat(&TokenKind::CloseDelim(Delimiter::Bracket));
     ret

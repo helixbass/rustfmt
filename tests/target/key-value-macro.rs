@@ -22,5 +22,5 @@ rule! {
 rule! {
     key => {
         nested_key => value,
-    }
+    },
 }

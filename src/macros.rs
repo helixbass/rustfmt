@@ -1495,7 +1495,11 @@ fn format_arrow_separated_key_value_pairs(
                 nested_shape.sub_width(1)?,
             )?,
             ExprOrArrowSeparatedKeyValuePairs::ArrowSeparatedKeyValuePairs(value) => {
-                format_arrow_separated_key_value_pairs(context, shape, value)?
+                key_value_pair.push_str(&format!(
+                    " {}",
+                    format_arrow_separated_key_value_pairs(context, nested_shape, value)?
+                ));
+                key_value_pair
             }
         });
         result.push(',');
