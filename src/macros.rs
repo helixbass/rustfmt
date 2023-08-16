@@ -28,7 +28,10 @@ use crate::config::lists::*;
 use crate::expr::{rewrite_array, rewrite_assign_rhs, RhsAssignKind};
 use crate::lists::{itemize_list, write_list, ListFormatting};
 use crate::overflow;
-use crate::parse::macros::arrow_separated_key_value_pairs::parse_arrow_separated_key_value_pairs;
+use crate::parse::macros::arrow_separated_key_value_pairs::{
+    parse_arrow_separated_key_value_pairs, ArrowSeparatedKeyValuePairs,
+    ExprOrArrowSeparatedKeyValuePairs,
+};
 use crate::parse::macros::lazy_static::parse_lazy_static;
 use crate::parse::macros::{parse_expr, parse_macro_args, ParsedMacroArgs};
 use crate::rewrite::{Rewrite, RewriteContext};
@@ -235,7 +238,7 @@ fn rewrite_macro_inner(
 
     if macro_name == "rule!" && !has_comment {
         if let success @ Some(..) =
-            format_arrow_separated_key_value_pairs(context, shape, ts.clone(), &macro_name)
+            format_arrow_separated_key_value_pairs_macro(context, shape, ts.clone(), &macro_name)
         {
             return success;
         }
@@ -1447,32 +1450,54 @@ fn rewrite_macro_with_items(
     Some(result)
 }
 
-fn format_arrow_separated_key_value_pairs(
+fn format_arrow_separated_key_value_pairs_macro(
     context: &RewriteContext<'_>,
     shape: Shape,
     ts: TokenStream,
     macro_name: &str,
+) -> Option<String> {
+    let parsed_elems = parse_arrow_separated_key_value_pairs(context, ts)?;
+
+    let mut result = String::with_capacity(1024);
+
+    result.push_str(&format!("{macro_name} "));
+    result.push_str(&format_arrow_separated_key_value_pairs(
+        context,
+        shape,
+        &parsed_elems,
+    )?);
+    Some(result)
+}
+
+fn format_arrow_separated_key_value_pairs(
+    context: &RewriteContext<'_>,
+    shape: Shape,
+    parsed_elems: &ArrowSeparatedKeyValuePairs,
 ) -> Option<String> {
     let mut result = String::with_capacity(1024);
     let nested_shape = shape
         .block_indent(context.config.tab_spaces())
         .with_max_width(context.config);
 
-    result.push_str(&format!("{macro_name} {{"));
+    result.push('{');
     result.push_str(&nested_shape.indent.to_string_with_newline(context.config));
 
-    let parsed_elems = parse_arrow_separated_key_value_pairs(context, ts)?;
     let last = parsed_elems.len() - 1;
     for (i, (key, value)) in parsed_elems.iter().enumerate() {
         let mut key_value_pair = String::with_capacity(128);
         key_value_pair.push_str(&format!("{} =>", key.rewrite(context, nested_shape)?));
-        result.push_str(&rewrite_assign_rhs(
-            context,
-            key_value_pair,
-            &*value,
-            &RhsAssignKind::Expr(&value.kind, value.span),
-            nested_shape.sub_width(1)?,
-        )?);
+        result.push_str(&match value {
+            ExprOrArrowSeparatedKeyValuePairs::Expr(value) => rewrite_assign_rhs(
+                context,
+                key_value_pair,
+                &*value,
+                &RhsAssignKind::Expr(&value.kind, value.span),
+                nested_shape.sub_width(1)?,
+            )?,
+            ExprOrArrowSeparatedKeyValuePairs::ArrowSeparatedKeyValuePairs(value) => {
+                format_arrow_separated_key_value_pairs(context, shape, value)?
+            }
+        });
         result.push(',');
         if i != last {
             result.push_str(&nested_shape.indent.to_string_with_newline(context.config));

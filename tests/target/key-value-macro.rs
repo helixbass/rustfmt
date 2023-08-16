@@ -17,3 +17,10 @@ rule! {
 rule! {
     key => value,
 }
+
+// nested curly brackets
+rule! {
+    key => {
+        nested_key => value,
+    }
+}
