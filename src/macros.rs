@@ -1514,6 +1514,10 @@ fn format_arrow_separated_key_value_pairs(
                 ));
                 key_value_pair
             }
+            ExprOrArrowSeparatedKeyValuePairs::TokenTree(value) => {
+                key_value_pair.push_str(&format!(" {}", context.snippet(value.span())));
+                key_value_pair
+            }
         });
         result.push(',');
         if i != last {
