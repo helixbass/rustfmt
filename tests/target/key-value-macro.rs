@@ -31,3 +31,17 @@ rule! {
         nested_key => value,
     ],
 }
+
+// nested array literal
+rule! {
+    key => [
+        nested_key => ["foo", "bar"],
+    ],
+}
+
+// nested block
+rule! {
+    key => [
+        nested_key => { "foo" },
+    ],
+}
